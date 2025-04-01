@@ -10,7 +10,9 @@
 - 支持中文标题和标签
 - 自动保存图表为PNG格式
 - 专业学术图表风格
-
+## 例图
+![产出例图]([图片的网络链接](https://github.com/Chinaduanyun/R_Learning-Develop/blob/main/散点图/例图.png
+))
 ## 使用说明
 
 ### 1. 系统要求
