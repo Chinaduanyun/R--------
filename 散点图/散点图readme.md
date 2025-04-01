@@ -11,6 +11,10 @@
 - 自动保存图表为PNG格式
 - 专业学术图表风格
 ## 例图
+<a href='https://nextchat.club'>
+  <img src="https://github.com/Chinaduanyun/R_Learning-Develop/blob/main/散点图/例图.png" width="1000" alt="icon"/>
+</a>
+
 ![产出例图]([图片的网络链接](https://github.com/Chinaduanyun/R_Learning-Develop/blob/main/散点图/例图.png
 ))
 ## 使用说明
