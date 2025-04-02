@@ -8,3 +8,7 @@
 只支持两变量的数据，要求输入标题与数据，输出图片
 产出图片风格偏学术
 [点击查看](https://github.com/Chinaduanyun/R_Learning-Develop/tree/main/散点图)
+- **箱线图**  
+支持被试内设计和被试间设计的数据输入，用户可自定义变量名称、数据以及轴标签。程序会根据实验设计类型生成对应的箱线图，展示数据的分布情况，包括中位数、四分位数及异常值。  
+产出图片风格偏学术，支持中文字体显示，适合用于论文或报告展示。  
+[点击查看](https://github.com/Chinaduanyun/R_Learning-Develop/tree/main/箱线图)  
