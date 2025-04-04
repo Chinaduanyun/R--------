@@ -1,3 +1,4 @@
+
 # 加载必要的包
 library(ggplot2)
 library(ggthemes)
@@ -56,7 +57,7 @@ if(design_type == 1) {
     # 修改y轴标签为竖排显示：每个字符一行
     y_label <- paste(strsplit(y_label, "")[[1]], collapse="\n")
     # 数据标签选项
-    cat("请选择数据标签显示方式（0:不显示, 1:只显示均值, 2:只显示标准差, 3:均值和标准差）：\n")
+    cat("请选择数据标签显示方式:\n0:不显示\n1:只显示均值\n2:只显示标准差\n3:均值和标准差\n")
     label_type <- as.numeric(readline())
     
     # 误差棒选项
@@ -110,49 +111,8 @@ if(design_type == 1) {
         y_max <- max(plot_data$mean + error_multiplier * plot_data$sd, na.rm = TRUE) * 1.1
     }
     
-    # 在数据处理后，显著性检验前添加
-    if(sig_choice == 1) {
-        # 进行两两t检验
-        sig_results <- data.frame(
-            group1 = character(),
-            group2 = character(),
-            p_value = numeric(),
-            sig_level = character(),
-            y_position = numeric(),
-            stringsAsFactors = FALSE
-        )
-        
-        # 两两比较
-        for(i in 1:(var_count-1)) {
-            for(j in (i+1):var_count) {
-                t_result <- t.test(all_data[[i]], all_data[[j]])
-                p_val <- t_result$p.value
-                
-                # 确定显著性级别
-                sig_mark <- ""
-                if(p_val < 0.001) sig_mark <- "***"
-                else if(p_val < 0.01) sig_mark <- "**"
-                else if(p_val < 0.05) sig_mark <- "*"
-                
-                if(p_val < 0.05) {  # 只记录显著的结果
-                    # 计算显示位置（取两个柱子的最大值）
-                    max_height <- max(
-                        plot_data$mean[i] + error_multiplier * plot_data$sd[i],
-                        plot_data$mean[j] + error_multiplier * plot_data$sd[j]
-                    )
-                    y_pos <- max_height + 0.1 * y_max
-                    
-                    sig_results <- rbind(sig_results, data.frame(
-                        group1 = var_labels[i],
-                        group2 = var_labels[j],
-                        p_value = p_val,
-                        sig_level = sig_mark,
-                        y_position = y_pos
-                    ))
-                }
-            }
-        }
-    }
+    # 显著性检验结果存储
+    sig_results <- NULL
     
     # 创建图形
     p <- ggplot(plot_data, aes(x = label_name, y = mean)) +
@@ -177,48 +137,71 @@ if(design_type == 1) {
             axis.text.x = element_text(hjust = 0.5)  # 确保X轴文字居中对齐
         )
     
-    # 新增：根据显著性标志选项，添加显著性标记
+ # 显著性标记部分
     if(sig_choice == 1) {
-        p <- p + geom_text(aes(label = "*", y = mean + error_multiplier * sd + 0.05 * y_max),
-                           size = 6)
-    }
-    
-    # 添加显著性标记
-    if (sig_choice == 1 && nrow(sig_results) > 0) {
-        for (i in 1:nrow(sig_results)) {
-            group1_index <- which(plot_data$label_name == sig_results$group1[i])
-            group2_index <- which(plot_data$label_name == sig_results$group2[i])
-            y_pos <- sig_results$y_position[i]
-            
-            # 添加显著性连接线和标记
-            p <- p +
-                # 添加水平线
-                geom_segment(
-                    aes(x = group1_index, xend = group2_index,
-                        y = y_pos, yend = y_pos),
-                    inherit.aes = FALSE,
-                    size = 0.5
-                ) +
-                # 添加左侧竖线
-                geom_segment(
-                    aes(x = group1_index, xend = group1_index,
-                        y = y_pos - 0.02 * y_max, yend = y_pos),
-                    inherit.aes = FALSE,
-                    size = 0.5
-                ) +
-                # 添加右侧竖线
-                geom_segment(
-                    aes(x = group2_index, xend = group2_index,
-                        y = y_pos - 0.02 * y_max, yend = y_pos),
-                    inherit.aes = FALSE,
-                    size = 0.5
-                ) +
-                # 添加显著性标记
-                annotate("text",
-                         x = mean(c(group1_index, group2_index)),
-                         y = y_pos + 0.02 * y_max,
-                         label = sig_results$sig_level[i],
-                         size = 5)
+        # 进行两两配对t检验并存储显著结果
+        for(i in 1:(var_count-1)) {
+            for(j in (i+1):var_count) {
+                # 配对t检验前验证数据
+                if(length(all_data[[i]]) != length(all_data[[j]])) {
+                    warning(paste("跳过比较", var_labels[i], "和", var_labels[j],
+                                "因为数据长度不一致(需要相同长度进行配对检验)"))
+                    next
+                }
+                if(sd(all_data[[i]]) == 0 || sd(all_data[[j]]) == 0) {
+                    warning(paste("跳过比较", var_labels[i], "和", var_labels[j],
+                                "因为至少有一组数据是恒量"))
+                    next
+                }
+                tryCatch({
+                    test_result <- t.test(all_data[[i]], all_data[[j]], paired = TRUE)
+                    p_val <- test_result$p.value
+                }, error = function(e) {
+                    warning(paste("比较", var_labels[i], "和", var_labels[j],
+                                "时出错:", e$message))
+                    return(NULL)
+                })
+                if(is.null(p_val)) next
+                
+                if(p_val < 0.05) {  # 只处理显著结果
+                    # 确定显著性标记
+                    sig_stars <- ifelse(p_val < 0.001, "***",
+                                      ifelse(p_val < 0.01, "**",
+                                            ifelse(p_val < 0.05, "*", "")))
+                    
+                    # 计算标记位置
+                    y_base <- max(c(
+                        plot_data$mean[i] + error_multiplier * plot_data$sd[i],
+                        plot_data$mean[j] + error_multiplier * plot_data$sd[j]
+                    )) * 1.1
+                    y_line <- y_base + 0.05 * y_max
+                    y_text <- y_line + 0.02 * y_max
+                    
+                    # 添加到图形
+                    p <- p +
+                        # 左侧竖线
+                        annotate("segment",
+                               x = i, xend = i,
+                               y = y_base, yend = y_line,
+                               size = 0.5) +
+                        # 右侧竖线
+                        annotate("segment",
+                               x = j, xend = j,
+                               y = y_base, yend = y_line,
+                               size = 0.5) +
+                        # 横线
+                        annotate("segment",
+                               x = i, xend = j,
+                               y = y_line, yend = y_line,
+                               size = 0.5) +
+                        # 星号标记
+                        annotate("text",
+                               x = mean(c(i, j)),
+                               y = y_text,
+                               label = sig_stars,
+                               size = 4)
+                }
+            }
         }
     }
     
@@ -230,7 +213,7 @@ if(design_type == 1) {
     file_name <- paste0("barplot_", current_time, ".png")
     ggsave(file_name, plot = p, width = 6, height = 6, dpi = 300)
     cat("图片已保存为", file_name, "\n")
-    
+
 } else if(design_type == 2) {
     cat("被试间设计功能尚未开发\n")
 }
