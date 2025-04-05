@@ -1,4 +1,3 @@
-
 # 加载必要的包
 library(ggplot2)
 library(ggthemes)
@@ -134,11 +133,15 @@ if(design_type == 1) {
                                         angle = 0,  # 竖直显示
                                         vjust = 0.5),
             axis.title.x = element_text(vjust = -0.5),  # 调整X轴标签位置
-            axis.text.x = element_text(hjust = 0.5)  # 确保X轴文字居中对齐
+            axis.text.x = element_text(hjust = 0.5),  # 确保X轴文字居中对齐
+            panel.grid.major.y = element_line(color = "gray90", linewidth = 0.2)
         )
-    
- # 显著性标记部分
+     
+    # 显著性标记部分
     if(sig_choice == 1) {
+        # 初始化显著对计数器
+        sig_count <- 0
+        
         # 进行两两配对t检验并存储显著结果
         for(i in 1:(var_count-1)) {
             for(j in (i+1):var_count) {
@@ -148,11 +151,16 @@ if(design_type == 1) {
                                 "因为数据长度不一致(需要相同长度进行配对检验)"))
                     next
                 }
-                if(sd(all_data[[i]]) == 0 || sd(all_data[[j]]) == 0) {
-                    warning(paste("跳过比较", var_labels[i], "和", var_labels[j],
-                                "因为至少有一组数据是恒量"))
-                    next
-                }
+                # 显示数据统计信息
+                cat("\n----------------------------------------\n")
+                cat("正在比较以下两组数据:\n")
+                cat(sprintf("%s: 均值=%.4f, 标准差=%.4f (数据点数量=%d)\n",
+                          var_labels[i], mean(all_data[[i]]),
+                          sd(all_data[[i]]), length(all_data[[i]])))
+                cat(sprintf("%s: 均值=%.4f, 标准差=%.4f (数据点数量=%d)\n",
+                          var_labels[j], mean(all_data[[j]]),
+                          sd(all_data[[j]]), length(all_data[[j]])))
+                cat("----------------------------------------\n")
                 tryCatch({
                     test_result <- t.test(all_data[[i]], all_data[[j]], paired = TRUE)
                     p_val <- test_result$p.value
@@ -164,18 +172,19 @@ if(design_type == 1) {
                 if(is.null(p_val)) next
                 
                 if(p_val < 0.05) {  # 只处理显著结果
+                    sig_count <- sig_count + 1  # 增加计数器
+                    
                     # 确定显著性标记
                     sig_stars <- ifelse(p_val < 0.001, "***",
                                       ifelse(p_val < 0.01, "**",
                                             ifelse(p_val < 0.05, "*", "")))
                     
-                    # 计算标记位置
-                    y_base <- max(c(
-                        plot_data$mean[i] + error_multiplier * plot_data$sd[i],
-                        plot_data$mean[j] + error_multiplier * plot_data$sd[j]
-                    )) * 1.1
-                    y_line <- y_base + 0.05 * y_max
-                    y_text <- y_line + 0.02 * y_max
+                    # 计算标记位置 - 根据sig_count调整高度
+                    max_bar_top <- max(plot_data$mean + error_multiplier * plot_data$sd)
+                    y_spacing <- 0.05 * (y_max - max_bar_top)  # 每层显著性标记的间距
+                    y_base <- max_bar_top + (sig_count - 1) * y_spacing  # 基准高度随显著对数增加
+                    y_line <- y_base + 0.03 * (y_max - max_bar_top)
+                    y_text <- y_line + 0.01 * (y_max - max_bar_top)
                     
                     # 添加到图形
                     p <- p +
@@ -183,17 +192,17 @@ if(design_type == 1) {
                         annotate("segment",
                                x = i, xend = i,
                                y = y_base, yend = y_line,
-                               size = 0.5) +
+                               linewidth = 0.5) +
                         # 右侧竖线
                         annotate("segment",
                                x = j, xend = j,
                                y = y_base, yend = y_line,
-                               size = 0.5) +
+                               linewidth = 0.5) +
                         # 横线
                         annotate("segment",
                                x = i, xend = j,
                                y = y_line, yend = y_line,
-                               size = 0.5) +
+                               linewidth = 0.5) +
                         # 星号标记
                         annotate("text",
                                x = mean(c(i, j)),
@@ -202,6 +211,12 @@ if(design_type == 1) {
                                size = 4)
                 }
             }
+        }
+        
+        # 根据显著对数动态调整y轴最大值
+        if(sig_count > 0) {
+            y_max <- max_bar_top + (sig_count + 1) * y_spacing
+            p <- p + scale_y_continuous(limits = c(0, y_max), expand = c(0, 0))
         }
     }
     
